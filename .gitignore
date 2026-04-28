@@ -1,0 +1,39 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Cocos2d-x build artifacts
+cocos2d/
+*.app/
+*.apk
+*.ipa
+bin/
+publish/
+runtime/
+
+# Android
+proj.android-studio/.gradle/
+proj.android-studio/.idea/
+proj.android-studio/local.properties
+proj.android-studio/app/.cxx/
+proj.android-studio/app/build/
+proj.android-studio/build/
+proj.android-studio/gradle/
+proj.android-studio/gradlew
+proj.android-studio/gradlew.bat
+proj.android-studio/captures/
+proj.android-studio/*.iml
+
+# iOS
+proj.ios_mac/ios/Pods/
+proj.ios_mac/ios/Podfile.lock
+proj.ios_mac/ios/*.xcworkspace/
+proj.ios_mac/build/
+proj.ios_mac/*.xcworkspace/xcuserdata/
+proj.ios_mac/*.xcodeproj/xcuserdata/
+proj.ios_mac/*.xcodeproj/project.xcworkspace/xcuserdata/
+proj.ios_mac/DerivedData/
+
+# IDE
+.vscode/
+*.swp

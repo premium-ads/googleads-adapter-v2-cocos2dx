@@ -1,0 +1,18 @@
+platform :ios, '13.0'
+use_frameworks!
+inhibit_all_warnings!
+
+project '../GoogleAdsCocos2dxSample.xcodeproj'
+
+target 'GoogleAdsCocos2dxSample-mobile' do
+  pod 'Google-Mobile-Ads-SDK', '~> 13.0'
+  pod 'PremiumAdsGoogleAdapter', '~> 1.0.6'
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |t|
+    t.build_configurations.each do |c|
+      c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+    end
+  end
+end

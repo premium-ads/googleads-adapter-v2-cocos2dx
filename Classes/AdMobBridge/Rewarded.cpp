@@ -1,0 +1,77 @@
+#include "Rewarded.h"
+#include "AdMobBridgeCpp.h"
+#include "platform/CCPlatformConfig.h"
+
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+    #include "platform/android/jni/JniHelper.h"
+    static const char* kJNI = "net/premiumads/cocos2dx/admob/RewardedJNI";
+#elif (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
+    extern "C" void admob_ios_rewarded_load(const char* adUnitId);
+    extern "C" bool admob_ios_rewarded_isReady();
+    extern "C" void admob_ios_rewarded_show();
+#endif
+
+namespace admob {
+
+Rewarded::Listener Rewarded::s_listener;
+void Rewarded::setListener(Listener cb) { s_listener = std::move(cb); }
+
+void Rewarded::load(const std::string& adUnitId) {
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+    cocos2d::JniMethodInfo info;
+    if (cocos2d::JniHelper::getStaticMethodInfo(info, kJNI, "load", "(Ljava/lang/String;)V")) {
+        jstring jId = info.env->NewStringUTF(adUnitId.c_str());
+        info.env->CallStaticVoidMethod(info.classID, info.methodID, jId);
+        info.env->DeleteLocalRef(jId); info.env->DeleteLocalRef(info.classID);
+    }
+#elif (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
+    admob_ios_rewarded_load(adUnitId.c_str());
+#endif
+}
+
+bool Rewarded::isReady() {
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+    cocos2d::JniMethodInfo info;
+    if (cocos2d::JniHelper::getStaticMethodInfo(info, kJNI, "isReady", "()Z")) {
+        jboolean r = info.env->CallStaticBooleanMethod(info.classID, info.methodID);
+        info.env->DeleteLocalRef(info.classID);
+        return r == JNI_TRUE;
+    }
+    return false;
+#elif (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
+    return admob_ios_rewarded_isReady();
+#else
+    return false;
+#endif
+}
+
+void Rewarded::show() {
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+    cocos2d::JniMethodInfo info;
+    if (cocos2d::JniHelper::getStaticMethodInfo(info, kJNI, "show", "()V")) {
+        info.env->CallStaticVoidMethod(info.classID, info.methodID);
+        info.env->DeleteLocalRef(info.classID);
+    }
+#elif (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
+    admob_ios_rewarded_show();
+#endif
+}
+
+void Rewarded::onPlatformEvent(int code, const std::string& msg) {
+    if (!s_listener) return;
+    auto e = static_cast<RewardedEvent>(code);
+    auto m = msg; auto l = s_listener;
+    dispatchOnCocosThread([l, e, m]() { l(e, m); });
+}
+
+}
+
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+extern "C" JNIEXPORT void JNICALL
+Java_net_premiumads_cocos2dx_admob_RewardedJNI_nativeOnEvent(
+        JNIEnv* env, jclass, jint code, jstring msg) {
+    const char* c = msg ? env->GetStringUTFChars(msg, nullptr) : "";
+    admob::Rewarded::onPlatformEvent((int)code, std::string(c ? c : ""));
+    if (msg) env->ReleaseStringUTFChars(msg, c);
+}
+#endif

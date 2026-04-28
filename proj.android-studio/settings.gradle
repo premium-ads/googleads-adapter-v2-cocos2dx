@@ -1,0 +1,2 @@
+include ':GoogleAdsCocos2dxSample'
+project(':GoogleAdsCocos2dxSample').projectDir = new File(settingsDir, 'app')

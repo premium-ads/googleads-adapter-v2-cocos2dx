@@ -1,0 +1,61 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'net.premiumads.cocos2dx.sample'
+    compileSdkVersion 34
+    ndkVersion "27.0.12077973"
+
+    defaultConfig {
+        applicationId 'net.premiumads.cocos2dx.sample'
+        minSdkVersion 21
+        targetSdkVersion 34
+        versionCode 1
+        versionName '1.0.0'
+        externalNativeBuild {
+            ndkBuild {
+                targets 'cocos2dcpp'
+                arguments 'NDK_TOOLCHAIN_VERSION=clang', 'APP_PLATFORM=android-21'
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
+            }
+        }
+    }
+
+    sourceSets.main {
+        java.srcDirs = ['src/main/java', '../../cocos2d/cocos/platform/android/java/src']
+        aidl.srcDirs = ['../../cocos2d/cocos/platform/android/java/src']
+        manifest.srcFile 'src/main/AndroidManifest.xml'
+        res.srcDirs = ['src/main/res']
+        jniLibs.srcDirs = ['libs']
+    }
+
+    buildFeatures {
+        aidl true
+        buildConfig true
+    }
+
+    externalNativeBuild {
+        ndkBuild {
+            path 'src/main/jni/Android.mk'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        debug { jniDebuggable true }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: '../../cocos2d/cocos/platform/android/java/libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.gms:play-services-ads:23.6.0'
+    implementation 'net.premiumads.sdk:admob-adapter-v2:1.0.9'
+}

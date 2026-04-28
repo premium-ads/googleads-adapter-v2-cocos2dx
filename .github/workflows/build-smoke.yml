@@ -1,0 +1,138 @@
+name: Build smoke
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  android-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android NDK r27c
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: Cache Cocos2d-x 3.15.1 + deps
+        id: cache-cocos
+        uses: actions/cache@v4
+        with:
+          path: cocos2d-x
+          key: cocos2d-x-3.15.1-android-v3
+
+      - name: Download Cocos2d-x 3.15.1 + third-party deps
+        if: steps.cache-cocos.outputs.cache-hit != 'true'
+        run: |
+          curl -L -o engine.zip https://github.com/cocos2d/cocos2d-x/archive/refs/tags/cocos2d-x-3.15.1.zip
+          unzip -q engine.zip
+          mv cocos2d-x-cocos2d-x-3.15.1 cocos2d-x
+          # download-deps.py fetches the third-party prebuilt libs into external/
+          # (freetype2, png, jpeg, chipmunk, etc.) — required by ndk-build's
+          # import-module 'freetype2/prebuilt/android'.
+          cd cocos2d-x
+          python3 -c "
+          import os, ssl, urllib.request, zipfile, shutil
+          ssl._create_default_https_context = ssl._create_unverified_context
+          url = 'https://github.com/cocos2d/cocos2d-x-3rd-party-libs-bin/archive/refs/tags/v3-deps-130.zip'
+          urllib.request.urlretrieve(url, 'deps.zip')
+          with zipfile.ZipFile('deps.zip') as z: z.extractall('.')
+          src = 'cocos2d-x-3rd-party-libs-bin-3-deps-130'
+          if os.path.isdir('external'):
+              for entry in os.listdir(src):
+                  s = os.path.join(src, entry); d = os.path.join('external', entry)
+                  if os.path.isdir(d): shutil.rmtree(d)
+                  shutil.move(s, d)
+          else:
+              os.rename(src, 'external')
+          os.remove('deps.zip')
+          print('deps installed')
+          "
+
+      - name: Symlink engine
+        run: ln -s "$PWD/cocos2d-x" cocos2d
+
+      - name: Gradle assembleDebug
+        run: |
+          cd proj.android-studio
+          chmod +x gradlew 2>/dev/null || true
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.2 --distribution-type all
+          fi
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: proj.android-studio/app/build/outputs/apk/debug/*.apk
+
+  ios-smoke:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Cocos2d-x 3.15.1 + deps
+        id: cache-cocos
+        uses: actions/cache@v4
+        with:
+          path: cocos2d-x
+          key: cocos2d-x-3.15.1-ios-v3
+
+      - name: Download Cocos2d-x 3.15.1 + third-party deps
+        if: steps.cache-cocos.outputs.cache-hit != 'true'
+        run: |
+          curl -L -o engine.zip https://github.com/cocos2d/cocos2d-x/archive/refs/tags/cocos2d-x-3.15.1.zip
+          unzip -q engine.zip
+          mv cocos2d-x-cocos2d-x-3.15.1 cocos2d-x
+          cd cocos2d-x
+          python3 -c "
+          import os, ssl, urllib.request, zipfile, shutil
+          ssl._create_default_https_context = ssl._create_unverified_context
+          url = 'https://github.com/cocos2d/cocos2d-x-3rd-party-libs-bin/archive/refs/tags/v3-deps-130.zip'
+          urllib.request.urlretrieve(url, 'deps.zip')
+          with zipfile.ZipFile('deps.zip') as z: z.extractall('.')
+          src = 'cocos2d-x-3rd-party-libs-bin-3-deps-130'
+          if os.path.isdir('external'):
+              for entry in os.listdir(src):
+                  s = os.path.join(src, entry); d = os.path.join('external', entry)
+                  if os.path.isdir(d): shutil.rmtree(d)
+                  shutil.move(s, d)
+          else:
+              os.rename(src, 'external')
+          print('deps installed')
+          "
+
+      - name: Symlink engine
+        run: ln -s "$PWD/cocos2d-x" cocos2d
+
+      - name: Apply iOS engine + prebuilt patches
+        # Strip LC_VERSION_MIN_IPHONEOS from prebuilt arm64 libs (Apple Silicon
+        # simulator linker fix) + iconv_t cast + system() guard for iOS 26 SDK.
+        run: |
+          bash tools/strip-prebuilt-platform.sh
+
+      - name: Pod install
+        run: |
+          cd proj.ios_mac/ios
+          pod install --repo-update
+
+      - name: Xcodebuild simulator
+        run: |
+          cd proj.ios_mac
+          xcodebuild -workspace ios/GoogleAdsCocos2dxSample.xcworkspace \
+                     -scheme GoogleAdsCocos2dxSample-mobile \
+                     -sdk iphonesimulator \
+                     -configuration Debug \
+                     -destination 'generic/platform=iOS Simulator' \
+                     build CODE_SIGNING_ALLOWED=NO
